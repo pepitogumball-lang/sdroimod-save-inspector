@@ -27,7 +27,7 @@ jobs:
           for forbidden in ('fetch(', 'XMLHttpRequest', 'sendBeacon', 'FormData(', 'WebSocket('):
               assert forbidden not in script, forbidden
           assert '20 * 1024 * 1024' in script
-          for marker in ('slot0.player', 'cabecera SDMOD_ENC_V1', 'ZIP64 no soportado', 'data descriptor', '20 * 1024 * 1024'):
+          for marker in ('slot0.player', 'prefijo y bloques AES', 'ZIP64 no soportado', 'data descriptor', '20 * 1024 * 1024'):
               assert marker in s, marker
           print('static page privacy/size checks passed')
           PYCODE
