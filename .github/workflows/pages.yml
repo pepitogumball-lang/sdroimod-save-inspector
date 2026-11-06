@@ -1,46 +1,51 @@
-name: Deploy SDroiMod Save Inspector to GitHub Pages
+name: Test and deploy local save editor
 on:
   push:
     branches: [main]
-    paths: ['index.html','.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: pages-save-inspector
+  group: pages-save-editor
   cancel-in-progress: true
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate static local-only page
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Static safety checks
         run: |
-          set -euo pipefail
-          test -s index.html
-          test "$(wc -c < index.html)" -lt 5242880
-          python3 - <<'PYCODE'
+          python3 - <<'PY'
           from pathlib import Path
+          import re
           s=Path('index.html').read_text()
           assert '<html lang="es-MX">' in s
-          script=s.split('<script>',1)[1].split('</script>',1)[0]
-          for forbidden in ('fetch(', 'XMLHttpRequest', 'sendBeacon', 'FormData(', 'WebSocket('):
-              assert forbidden not in script, forbidden
-          assert '20 * 1024 * 1024' in script
-          for marker in ('slot0.player', 'prefijo y bloques AES', 'ZIP64 no soportado', 'data descriptor', '20 * 1024 * 1024'):
-              assert marker in s, marker
-          print('static page privacy/size checks passed')
-          PYCODE
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+          assert "connect-src 'none'" in s and "form-action 'none'" in s
+          assert 'innerHTML' not in s and 'eval(' not in s
+          assert 'SDMOD_ENC_V1:' in s and 'SDroiMod_MRSE_26' in s
+          assert 'Recompilar y descargar .sdroimod' in s
+          assert 'mini.sdroimod' not in s
+          print('static safety checks passed')
+          PY
+      - name: Assemble clean Pages artifact
+        run: |
+          mkdir -p site
+          cp index.html site/
+      - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: site
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: test
     permissions:
       pages: write
       id-token: write
