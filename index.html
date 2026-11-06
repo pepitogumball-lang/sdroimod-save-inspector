@@ -107,7 +107,7 @@
           if(isSdroimod && method!==8) throw new Error('el exportador de Android observado crea miembros ZIP DEFLATE');
           const name=new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(pos+46,pos+46+nlen));
           if(seenNames.has(name)) throw new Error('nombre de entrada duplicado'); seenNames.add(name);
-          if(name.startsWith('/') || name.includes('\\\\') || name.split('/').includes('..') || /[\\u0000-\\u001f]/.test(name)) throw new Error('nombre ZIP inseguro');
+          if(name.startsWith('/') || name.includes('\\') || name.split('/').includes('..') || /[\u0000-\u001f]/.test(name)) throw new Error('nombre ZIP inseguro');
           if(lhoff+30>cdOffset || view.getUint32(lhoff,true)!==0x04034b50) throw new Error('cabecera local inconsistente');
           const lnl=view.getUint16(lhoff+26,true), lxl=view.getUint16(lhoff+28,true), dataStart=lhoff+30+lnl+lxl;
           if(dataStart+csize>cdOffset) throw new Error('entrada ZIP excede datos antes del directorio');
@@ -125,7 +125,7 @@
           } else if(localC!==csize || localU!==usize || localCRC!==crc) throw new Error('cabecera local y directorio ZIP discrepan');
           for(const r of seenRanges) if(lhoff<r.end && localEnd>r.start) throw new Error('rangos locales ZIP se superponen');
           seenRanges.push({start:lhoff,end:localEnd});
-          const encrypted=!!(flags&1), m=name.match(/(?:^|\\/)slot([0-2])\\.player$/i);
+          const encrypted=!!(flags&1), m=name.match(/(?:^|\/)slot([0-2])\.player$/i);
           if(m) slots.push('slot'+m[1]+'.player'+(encrypted?' · bandera ZIP cifrada (no esperada)':' · payload cifrado SDMOD')); 
           if(isSdroimod && m && encrypted) throw new Error('el export SDroiMod cifra el payload dentro del miembro; cifrado ZIP adicional no esperado');
           if(isSdroimod && m && usize>2*1024*1024) throw new Error('slot de guardado excede 2 MiB');
