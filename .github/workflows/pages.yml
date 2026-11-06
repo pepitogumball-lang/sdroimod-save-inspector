@@ -1,0 +1,53 @@
+name: Deploy SDroiMod Save Inspector to GitHub Pages
+
+on:
+  push:
+    branches: [feature/sdroimod-save-inspector]
+    paths:
+      - 'save-inspector/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-save-inspector
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate static local-only page
+        run: |
+          set -euo pipefail
+          test -s save-inspector/index.html
+          test "$(wc -c < save-inspector/index.html)" -lt 5242880
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('save-inspector/index.html').read_text()
+          assert '<html lang="es-MX">' in s
+          assert 'fetch(' not in s and 'XMLHttpRequest' not in s and 'sendBeacon' not in s
+          assert 'FormData(' not in s and 'WebSocket(' not in s
+          assert '50 * 1024 * 1024' in s
+          print('static page privacy/size checks passed')
+          PY
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: save-inspector
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
