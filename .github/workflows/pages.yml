@@ -17,13 +17,9 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-        working-directory: scratch/editor
       - run: npx playwright install --with-deps chromium
-        working-directory: scratch/editor
       - run: npm test
-        working-directory: scratch/editor
       - name: Static safety checks
-        working-directory: scratch/editor
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -40,7 +36,7 @@ jobs:
       - name: Assemble clean Pages artifact
         run: |
           mkdir -p site
-          cp scratch/editor/index.html site/
+          cp index.html site/
           # The public Pages artifact intentionally contains only this page; no sample saves or tests.
       - uses: actions/upload-pages-artifact@v3
         with:
