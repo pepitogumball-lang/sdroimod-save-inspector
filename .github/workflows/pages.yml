@@ -26,7 +26,9 @@ jobs:
           script=s.split('<script>',1)[1].split('</script>',1)[0]
           for forbidden in ('fetch(', 'XMLHttpRequest', 'sendBeacon', 'FormData(', 'WebSocket('):
               assert forbidden not in script, forbidden
-          assert '50 * 1024 * 1024' in script
+          assert '20 * 1024 * 1024' in script
+          for marker in ('slot0.player', 'SDMOD_ENC_V1:', 'ZIP64 no soportado'):
+              assert marker in s, marker
           print('static page privacy/size checks passed')
           PYCODE
       - name: Upload Pages artifact
