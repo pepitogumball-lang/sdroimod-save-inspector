@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SDroiMod Save Inspector</title>
+<meta name="description" content="Inspecciona guardados localmente en tu navegador; el archivo no se sube.">
+<meta name="theme-color" content="#121725">
+<style>
+:root{color-scheme:dark;--bg:#101521;--panel:#191f2e;--line:#30394d;--ink:#f2f4fa;--muted:#aeb8cb;--cyan:#68e1d5;--yellow:#f3cf77;--red:#ff8989}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#202a40 0,#101521 55%);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:960px;margin:auto;padding:28px 18px 56px}header{margin:14px 0 24px}h1{font-size:clamp(1.8rem,5vw,2.8rem);line-height:1.1;margin:8px 0 12px;letter-spacing:-.04em}.eyebrow{color:var(--cyan);text-transform:uppercase;font-size:.75rem;font-weight:800;letter-spacing:.14em}.lead{color:var(--muted);max-width:720px}.panel{background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:18px;padding:20px;margin:16px 0;box-shadow:0 16px 50px #0002}.privacy{border-left:4px solid var(--cyan)}.privacy strong{color:var(--cyan)}.drop{display:grid;place-items:center;text-align:center;min-height:160px;border:1px dashed #586780;border-radius:14px;background:#111725;padding:20px;cursor:pointer}.drop:hover,.drop:focus-within{border-color:var(--cyan)}input[type=file]{max-width:100%;margin-top:14px}.status{padding:14px;border-radius:12px;background:#121927;border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere}.status.good{border-color:#27756e}.status.warn{border-color:#836f3e}.status.bad{border-color:#854c53}.muted{color:var(--muted)}label{display:block;font-weight:700;margin:12px 0 6px}textarea{width:100%;min-height:300px;background:#0d121c;color:#e7edf8;border:1px solid #46536c;border-radius:12px;padding:14px;font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}button{border:0;border-radius:10px;padding:11px 16px;background:var(--cyan);color:#071a1a;font-weight:800;cursor:pointer;margin:12px 8px 0 0}button.secondary{background:#30394d;color:var(--ink)}button:disabled{opacity:.4;cursor:not-allowed}.hidden{display:none}.badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--muted);font-size:.8rem}details{margin-top:16px}summary{cursor:pointer;color:var(--cyan);font-weight:700}code{overflow-wrap:anywhere}footer{color:var(--muted);font-size:.85rem;padding:12px 4px}ul{color:var(--muted)}@media(max-width:600px){.panel{padding:16px}main{padding:20px 14px 42px}}
+</style>
+</head>
+<body><main>
+<header><div class="eyebrow">Herramienta local · versión experimental</div><h1>SDroiMod Save Inspector</h1><p class="lead">Inspecciona un guardado y, si su contenido es JSON o texto legible, edítalo y descarga una copia. Esta página todavía <b>no puede descomprimir ni recompilar</b> archivos binarios .sdroimod sin conocer su formato.</p></header>
+<section class="panel privacy"><strong>Privacidad:</strong> el archivo se procesa en esta pestaña; no se sube a GitHub ni a ningún servidor. No cierres la pestaña hasta descargar una copia de respaldo.</section>
+<section class="panel"><h2>1. Abre una copia del guardado</h2><label class="drop" for="file"><span><b>Elige un archivo</b><br><span class="muted">.sdroimod, .json, .txt u otro archivo (máximo 50 MiB)</span><br><input id="file" type="file" accept=".sdroimod,.json,.txt,application/json,text/plain,application/octet-stream"></span></label><p id="filename" class="muted">Ningún archivo seleccionado.</p><div id="status" class="status" role="status" aria-live="polite">Al abrirlo, intentaré identificar JSON o texto UTF-8 válido. Un formato binario desconocido no se modificará.</div></section>
+<section id="editor-panel" class="panel hidden"><h2>2. Revisa el contenido</h2><p class="muted">Edita con cuidado. Solo se habilita la descarga cuando el contenido puede volver a validarse según el tipo identificado.</p><label for="editor">Contenido reconocido</label><textarea id="editor" spellcheck="false" aria-label="Contenido reconocido"></textarea><div><button id="download" disabled>Descargar copia editada</button><button id="restore" class="secondary" type="button">Restaurar contenido original</button></div><p id="validation" class="muted"></p></section>
+<section id="binary-panel" class="panel hidden"><h2>No se reconoce el formato interno</h2><p>El archivo parece binario, comprimido o codificado. No intentaré cambiar valores por búsqueda/reemplazo: eso podría corromper tu partida. Abajo solo muestro una vista hexadecimal limitada; no equivale a desofuscar ni a interpretar el guardado.</p><label for="hex">Primeros bytes (máximo 512)</label><textarea id="hex" readonly></textarea></section>
+<section class="panel"><h2>Estado y límites</h2><ul><li>El repositorio actual contiene datos de catálogo ENML, pero no se encontró un archivo .sdroimod de ejemplo ni una especificación verificable del guardado.</li><li>La página no afirma poder editar dinero, puntos de habilidades, logros o slots: esos campos solo se podrán exponer cuando se identifiquen en un formato real.</li><li>Guarda el original aparte. Una descarga editada no debe reemplazar tu único backup.</li><li>La compatibilidad del archivo resultante con Magic Rampage no está probada hasta importarlo en una copia del juego.</li></ul><details><summary>¿Qué se podrá habilitar después?</summary><p class="muted">Con un archivo de muestra (idealmente uno exportado por el juego), compararíamos estructura, cabecera, compresión/cifrado y checksum; después se añade un parser explícito con límites y pruebas de ida y vuelta. No se supone ni se inventa un algoritmo.</p></details></section>
+<footer>Esta herramienta corre localmente en el navegador. No es una herramienta oficial de Asantee Games ni una garantía de que un guardado modificado funcione.</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const MAX = 50 * 1024 * 1024;
+  const fileInput = document.getElementById('file');
+  const status = document.getElementById('status');
+  const filename = document.getElementById('filename');
+  const editorPanel = document.getElementById('editor-panel');
+  const binaryPanel = document.getElementById('binary-panel');
+  const editor = document.getElementById('editor');
+  const download = document.getElementById('download');
+  const validation = document.getElementById('validation');
+  const hex = document.getElementById('hex');
+  let original = null;
+  let currentName = 'save';
+  let kind = '';
+  let originalText = '';
+  function setStatus(text, mood) { status.textContent = text; status.className = 'status ' + (mood || ''); }
+  function validate() {
+    if (!kind) { download.disabled = true; return; }
+    if (kind === 'json') {
+      try { JSON.parse(editor.value); validation.textContent = 'JSON válido. La descarga conservará JSON UTF-8; el formato del juego no está certificado.'; download.disabled = false; }
+      catch (e) { validation.textContent = 'JSON inválido: ' + e.message; download.disabled = true; }
+    } else {
+      validation.textContent = 'Texto UTF-8 válido. La descarga será una copia de texto; no se reempaqueta a .sdroimod.';
+      download.disabled = false;
+    }
+  }
+  fileInput.addEventListener('change', async () => {
+    editorPanel.classList.add('hidden'); binaryPanel.classList.add('hidden');
+    original = null; kind = ''; download.disabled = true; validation.textContent = '';
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    filename.textContent = f.name + ' · ' + f.size.toLocaleString() + ' bytes'; currentName = f.name;
+    if (f.size > MAX) { setStatus('Archivo demasiado grande (límite 50 MiB). No se leyó.', 'bad'); return; }
+    if (!f.size) { setStatus('El archivo está vacío.', 'bad'); return; }
+    original = await f.arrayBuffer();
+    const bytes = new Uint8Array(original);
+    const hasNul = bytes.subarray(0, Math.min(bytes.length, 65536)).includes(0);
+    let text = '';
+    try { text = new TextDecoder('utf-8', {fatal:true}).decode(bytes); }
+    catch (_) { text = ''; }
+    if (!hasNul && text.length) {
+      const trimmed = text.trim();
+      try {
+        JSON.parse(trimmed);
+        kind = 'json'; editor.value = JSON.stringify(JSON.parse(trimmed), null, 2); originalText = editor.value;
+        editorPanel.classList.remove('hidden'); setStatus('Contenido JSON reconocido. Puedes editarlo, pero no hay evidencia de que un .sdroimod se serialice como JSON ni de que el juego acepte esta descarga.', 'warn'); validate(); return;
+      } catch (_) {}
+      if (!text.includes('\uFFFD') && !text.includes('\0')) {
+        kind = 'text'; editor.value = text; originalText = text;
+        editorPanel.classList.remove('hidden'); setStatus('Texto UTF-8 legible reconocido. Se puede descargar como copia de texto, no como archivo de guardado validado.', 'warn'); validate(); return;
+      }
+    }
+    binaryPanel.classList.remove('hidden');
+    const n = Math.min(bytes.length, 512); let rows=[];
+    for (let i=0;i<n;i+=16) {
+      const row=bytes.subarray(i,Math.min(i+16,n));
+      const hx=Array.from(row,b=>b.toString(16).padStart(2,'0')).join(' ').padEnd(47,' ');
+      const asc=Array.from(row,b=>b>=32&&b<127?String.fromCharCode(b):'.').join('');
+      rows.push(i.toString(16).padStart(8,'0')+'  '+hx+'  '+asc);
+    }
+    hex.value=rows.join('\n');
+    setStatus('Formato interno desconocido o binario. No se ofrecerá exportar un archivo modificado para evitar corromper la partida.', 'bad');
+  });
+  editor.addEventListener('input', validate);
+  document.getElementById('restore').addEventListener('click', () => { editor.value = originalText; validate(); });
+  download.addEventListener('click', () => {
+    if (!kind || download.disabled) return;
+    if (kind === 'json') { try { JSON.parse(editor.value); } catch (_) { return; } }
+    const blob = new Blob([editor.value], {type: kind === 'json' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    const base = currentName.replace(/[\\/]/g,'_').replace(/\.[^.]*$/,'') || 'save';
+    a.href = url; a.download = base + (kind === 'json' ? '.edited.json' : '.edited.txt'); document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+})();
+</script>
+</body></html>
