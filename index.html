@@ -16,7 +16,8 @@
 <section id="editor-panel" class="panel hidden"><h2>2. Revisa el contenido</h2><p class="muted">Edita con cuidado. Solo se habilita la descarga cuando el contenido puede volver a validarse según el tipo identificado.</p><label for="editor">Contenido reconocido</label><textarea id="editor" spellcheck="false" aria-label="Contenido reconocido"></textarea><div><button id="download" disabled>Descargar copia editada</button><button id="restore" class="secondary" type="button">Restaurar contenido original</button></div><p id="validation" class="muted"></p></section>
 <section id="archive-panel" class="panel hidden"><h2>Contenedor ZIP detectado — solo lectura</h2><p>La exportación SDroiMod se ha observado como ZIP con entradas cifradas de slots. Aquí solo se listan metadatos del directorio ZIP; no se descifra, modifica ni recompila el guardado.</p><div id="archive-info" class="status" role="status"></div></section>
 <section id="binary-panel" class="panel hidden"><h2>No se reconoce el formato interno</h2><p>El archivo parece binario, comprimido o codificado. No intentaré cambiar valores por búsqueda/reemplazo: eso podría corromper tu partida. Abajo solo muestro una vista hexadecimal limitada; no equivale a descifrar ni a interpretar el guardado.</p><label for="hex">Primeros bytes (máximo 512)</label><textarea id="hex" readonly></textarea></section>
-<section class="panel"><h2>Estado y límites</h2><ul><li>La APK exacta indica que .sdroimod contiene un ZIP con entradas slot0.player a slot2.player cifradas; la clave y el contenido interno aún no están verificados con un archivo real de muestra.</li><li>La página no afirma poder editar dinero, puntos de habilidades, logros o slots: esos campos solo se podrán exponer cuando se identifiquen en un formato real.</li><li>Guarda el original aparte. Una descarga editada no debe reemplazar tu único backup.</li><li>La compatibilidad del archivo resultante con Magic Rampage no está probada hasta importarlo en una copia del juego.</li><li>Los datos cifrados no se envían ni se editan: todavía no se implementa el descifrado ni la recompilación.</li></ul><details><summary>¿Qué se podrá habilitar después?</summary><p class="muted">Con un archivo de muestra (idealmente uno exportado por el juego), compararíamos estructura, cabecera, compresión/cifrado y checksum; después se añade un parser explícito con límites y pruebas de ida y vuelta. No se supone ni se inventa un algoritmo.</p></details></section>
+<section class="panel"><h2>Estado y límites</h2><ul><li>La APK exacta indica que .sdroimod contiene un ZIP con entradas slot0.player a slot2.player cifradas; la clave y el contenido interno aún no están verificados con un archivo real de muestra.</li><li>La página no afirma poder editar dinero, puntos de habilidades, logros o slots: esos campos solo se podrán exponer cuando se identifiquen en un formato real.</li><li>Guarda el original aparte. Una descarga editada no debe reemplazar tu único backup.</li><li>La compatibilidad del archivo resultante con Magic Rampage no está probada hasta importarlo en una copia del juego.</li>
+<li>Para interpretar dinero, habilidades y logros hará falta un guardado real y una prueba comparativa; los datos del catálogo no bastan.</li><li>Los datos cifrados no se envían ni se editan: todavía no se implementa el descifrado ni la recompilación.</li></ul><details><summary>¿Qué se podrá habilitar después?</summary><p class="muted">Con un archivo de muestra (idealmente uno exportado por el juego), compararíamos estructura, cabecera, compresión/cifrado y checksum; después se añade un parser explícito con límites y pruebas de ida y vuelta. No se supone ni se inventa un algoritmo.</p></details></section>
 <footer>Esta herramienta corre localmente en el navegador. No es una herramienta oficial de Asantee Games ni una garantía de que un guardado modificado funcione.</footer>
 </main>
 <script>
@@ -99,42 +100,46 @@
           const end=pos+46+nlen+xlen+clen; if(end>cdOffset+cdSize) throw new Error('nombre o campos ZIP truncados');
           if(csize===0xffffffff || usize===0xffffffff || lhoff===0xffffffff) throw new Error('entrada ZIP64 no soportada');
           if(usize>64*1024*1024 || csize>MAX) throw new Error('entrada excede el límite de tamaño permitido');
-          if(!(flags&0x800)) throw new Error('nombre de entrada no marcado UTF-8; se rechaza para evitar interpretaciones ambiguas');
+          if(!(flags&0x800) && bytes.subarray(pos+46,pos+46+nlen).some(b=>b>=0x80)) throw new Error('nombre no ASCII sin marca UTF-8; se rechaza por ambigüedad');
           if(method!==0 && method!==8) throw new Error('método de compresión ZIP no soportado');
-          if(seenNames.has(name)) throw new Error('nombre de entrada duplicado'); seenNames.add(name);
+          if(flags & ~0x0809) throw new Error('banderas ZIP no soportadas');
+          if(flags & 1) throw new Error('cifrado ZIP estándar no soportado; SDroiMod cifra el payload dentro de cada miembro');
+          if(isSdroimod && method!==8) throw new Error('el exportador de Android observado crea miembros ZIP DEFLATE');
           const name=new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(pos+46,pos+46+nlen));
+          if(seenNames.has(name)) throw new Error('nombre de entrada duplicado'); seenNames.add(name);
           if(name.startsWith('/') || name.includes('\\\\') || name.split('/').includes('..') || /[\\u0000-\\u001f]/.test(name)) throw new Error('nombre ZIP inseguro');
           if(lhoff+30>cdOffset || view.getUint32(lhoff,true)!==0x04034b50) throw new Error('cabecera local inconsistente');
           const lnl=view.getUint16(lhoff+26,true), lxl=view.getUint16(lhoff+28,true), dataStart=lhoff+30+lnl+lxl;
           if(dataStart+csize>cdOffset) throw new Error('entrada ZIP excede datos antes del directorio');
           const localName=new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(lhoff+30, lhoff+30+lnl)); if(localName!==name) throw new Error('nombre local y nombre central no coinciden');
-          for(const r of seenRanges) if(lhoff<r.end && dataStart+csize>r.start) throw new Error('rangos locales ZIP se superponen');
-          seenRanges.push({start:lhoff,end:dataStart+csize});
-          if(flags&0x8) throw new Error('ZIP con data descriptor no soportado en este inspector');
-          const lview=view, localFlags=lview.getUint16(lhoff+6,true), localMethod=lview.getUint16(lhoff+8,true), localC=lview.getUint32(lhoff+18,true), localU=lview.getUint32(lhoff+22,true);
-          if(localFlags!==flags || localMethod!==method || localC!==csize || localU!==usize) throw new Error('cabecera local y directorio ZIP discrepan');
+          const localFlags=view.getUint16(lhoff+6,true), localMethod=view.getUint16(lhoff+8,true), localC=view.getUint32(lhoff+18,true), localU=view.getUint32(lhoff+22,true), localCRC=view.getUint32(lhoff+14,true);
+          if(localFlags!==flags || localMethod!==method) throw new Error('banderas o método de cabecera local y directorio ZIP discrepan');
+          let localEnd=dataStart+csize;
+          if(flags&0x8) {
+            if(localC!==0 || localU!==0 || localCRC!==0) throw new Error('cabecera local con descriptor contradice los tamaños/CRC');
+            let dp=localEnd; if(dp+4<=cdOffset && view.getUint32(dp,true)===0x08074b50) dp+=4;
+            if(dp+12>cdOffset) throw new Error('data descriptor truncado');
+            const dcrc=view.getUint32(dp,true), dc=view.getUint32(dp+4,true), du=view.getUint32(dp+8,true);
+            if(dcrc!==crc || dc!==csize || du!==usize) throw new Error('data descriptor no coincide con directorio ZIP');
+            localEnd=dp+12;
+          } else if(localC!==csize || localU!==usize || localCRC!==crc) throw new Error('cabecera local y directorio ZIP discrepan');
+          for(const r of seenRanges) if(lhoff<r.end && localEnd>r.start) throw new Error('rangos locales ZIP se superponen');
+          seenRanges.push({start:lhoff,end:localEnd});
           const encrypted=!!(flags&1), m=name.match(/(?:^|\\/)slot([0-2])\\.player$/i);
-          if(m) slots.push('slot'+m[1]+'.player'+(encrypted?' · cifrado ZIP':' · sin cifrado ZIP')); 
-          if(isSdroimod && m && !encrypted) throw new Error('un slot .sdroimod aparece sin bandera de cifrado; rechazo el archivo');
+          if(m) slots.push('slot'+m[1]+'.player'+(encrypted?' · bandera ZIP cifrada (no esperada)':' · payload cifrado SDMOD')); 
+          if(isSdroimod && m && encrypted) throw new Error('el export SDroiMod cifra el payload dentro del miembro; cifrado ZIP adicional no esperado');
           if(isSdroimod && m && usize>2*1024*1024) throw new Error('slot de guardado excede 2 MiB');
           if(isSdroimod && !m && !name.endsWith('/')) throw new Error('entrada inesperada en .sdroimod: '+name);
-          if(isSdroimod && m && method!==0) throw new Error('el slot SDroiMod debe ser un miembro ZIP sin compresión exterior');
-          if(isSdroimod && m && csize!==usize) throw new Error('longitud del slot cifrado no coincide');
-          if(isSdroimod && m && (usize<32 || ((usize-13)%16)!==0)) throw new Error('longitud del slot incompatible con cabecera SDMOD_ENC_V1 y bloques AES');
-          const prefixLen = Math.min(csize, 13);
-          const payloadHead=bytes.subarray(dataStart,dataStart+prefixLen);
-          const prefix=[83,68,77,79,68,95,69,78,67,95,86,49,58];
-          const hasMagic=prefixLen===13 && prefix.every((b,j)=>payloadHead[j]===b);
-          if(isSdroimod && m && !hasMagic) throw new Error('slot sin cabecera SDMOD_ENC_V1; no se considera válido');
-          if(isSdroimod && m && hasMagic) slots[slots.length-1]+=' · cabecera SDMOD_ENC_V1';
+          if(isSdroimod && m && (usize<29 || ((usize-13)%16)!==0)) throw new Error('longitud de slot incompatible con prefijo y bloques AES');
           rows.push((i+1)+'. '+name+' · '+usize.toLocaleString()+' bytes'+(encrypted?' · encrypted flag':''));
           pos=end;
         }
         if(pos!==cdOffset+cdSize) throw new Error('tamaño del directorio ZIP no coincide');
         archivePanel.classList.remove('hidden');
-        if(isSdroimod && slots.length===0) throw new Error('no se encontraron slot0.player, slot1.player o slot2.player');
+        if(isSdroimod && (slots.length===0 || new Set(slots.map(x=>x.match(/slot([0-2])/)[1])).size!==slots.length)) throw new Error('no se encontraron slots válidos únicos slot0.player a slot2.player');
+        if(isSdroimod && count!==slots.length) throw new Error('el export SDroiMod debe contener solo los slots seleccionados');
         archiveInfo.textContent='ZIP válido en estructura básica · '+count+' entradas. Slots reconocidos: '+(slots.join(', ')||'ninguno')+'\\n\\n'+rows.join('\\n');
-        if(isSdroimod) setStatus('El contenedor y la cabecera de los slots coinciden con la estructura observada. No se descifró ni editó el guardado; el formato interno aún requiere validar un archivo real.', 'warn');
+        if(isSdroimod) setStatus('El ZIP y los nombres de slot coinciden con la estructura observada en la APK. La página no descomprime ni descifra los miembros: no se validó su cabecera interna ni el contenido del guardado.', 'warn');
         else setStatus('Se inspeccionó la estructura ZIP sin extraer sus entradas.', 'good');
         return;
       } catch(err) { setStatus('No se pudo validar el ZIP: '+err.message+'. No se modificó.', 'bad'); return; }
