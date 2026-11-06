@@ -32,42 +32,66 @@
   const validation = document.getElementById('validation');
   const hex = document.getElementById('hex');
   let original = null;
+  let readToken = 0;
   let currentName = 'save';
   let kind = '';
   let originalText = '';
   function setStatus(text, mood) { status.textContent = text; status.className = 'status ' + (mood || ''); }
+  function containsUnsafeInteger(value) {
+    if (typeof value === 'number') return Number.isInteger(value) && !Number.isSafeInteger(value);
+    if (Array.isArray(value)) return value.some(containsUnsafeInteger);
+    if (value && typeof value === 'object') return Object.values(value).some(containsUnsafeInteger);
+    return false;
+  }
   function validate() {
     if (!kind) { download.disabled = true; return; }
     if (kind === 'json') {
-      try { JSON.parse(editor.value); validation.textContent = 'JSON válido. La descarga conservará JSON UTF-8; el formato del juego no está certificado.'; download.disabled = false; }
-      catch (e) { validation.textContent = 'JSON inválido: ' + e.message; download.disabled = true; }
+      try {
+        const parsed = JSON.parse(editor.value);
+        if (containsUnsafeInteger(parsed)) throw new Error('hay enteros fuera del rango seguro de JavaScript');
+        validation.textContent = 'JSON válido. Enteros seguros; el formato del juego no está certificado.'; download.disabled = false;
+      } catch (e) { validation.textContent = 'No se puede exportar: ' + e.message; download.disabled = true; }
     } else {
       validation.textContent = 'Texto UTF-8 válido. La descarga será una copia de texto; no se reempaqueta a .sdroimod.';
       download.disabled = false;
     }
   }
   fileInput.addEventListener('change', async () => {
+    const token = ++readToken;
     editorPanel.classList.add('hidden'); binaryPanel.classList.add('hidden');
     original = null; kind = ''; download.disabled = true; validation.textContent = '';
     const f = fileInput.files && fileInput.files[0];
     if (!f) return;
     filename.textContent = f.name + ' · ' + f.size.toLocaleString() + ' bytes'; currentName = f.name;
+    const isSdroimod = f.name.toLowerCase().endsWith('.sdroimod');
     if (f.size > MAX) { setStatus('Archivo demasiado grande (límite 50 MiB). No se leyó.', 'bad'); return; }
     if (!f.size) { setStatus('El archivo está vacío.', 'bad'); return; }
-    original = await f.arrayBuffer();
-    const bytes = new Uint8Array(original);
+    let buffer;
+    try { buffer = await f.arrayBuffer(); } catch (_) { setStatus('El navegador no pudo leer el archivo; no se modificó.', 'bad'); return; }
+    if (token !== readToken) return;
+    const bytes = new Uint8Array(buffer);
     const hasNul = bytes.subarray(0, Math.min(bytes.length, 65536)).includes(0);
     let text = '';
     try { text = new TextDecoder('utf-8', {fatal:true}).decode(bytes); }
     catch (_) { text = ''; }
+    if (isSdroimod) {
+      binaryPanel.classList.remove('hidden');
+      const n = Math.min(bytes.length, 512); let rows=[];
+      for (let i=0;i<n;i+=16) { const row=bytes.subarray(i,Math.min(i+16,n)); const hx=Array.from(row,b=>b.toString(16).padStart(2,'0')).join(' ').padEnd(47,' '); const asc=Array.from(row,b=>b>=32&&b<127?String.fromCharCode(b):'.').join(''); rows.push(i.toString(16).padStart(8,'0')+'  '+hx+'  '+asc); }
+      hex.value=rows.join('\n'); setStatus('Archivo .sdroimod en modo de solo inspección. Su formato y sus campos no están verificados, así que no se habilita editar ni exportar.', 'bad'); return;
+    }
     if (!hasNul && text.length) {
       const trimmed = text.trim();
       try {
-        JSON.parse(trimmed);
-        kind = 'json'; editor.value = JSON.stringify(JSON.parse(trimmed), null, 2); originalText = editor.value;
-        editorPanel.classList.remove('hidden'); setStatus('Contenido JSON reconocido. Puedes editarlo, pero no hay evidencia de que un .sdroimod se serialice como JSON ni de que el juego acepte esta descarga.', 'warn'); validate(); return;
-      } catch (_) {}
-      if (!text.includes('\uFFFD') && !text.includes('\0')) {
+        const parsed = JSON.parse(trimmed);
+        if (containsUnsafeInteger(parsed)) throw new Error('enteros fuera del rango seguro');
+        kind = 'json'; editor.value = JSON.stringify(parsed, null, 2); originalText = editor.value;
+        editorPanel.classList.remove('hidden'); setStatus('JSON reconocido y sin enteros fuera del rango seguro. La descarga es JSON genérico, no un guardado validado del juego.', 'warn'); validate(); return;
+      } catch (err) {
+        if (/\.json$/i.test(f.name) || /json/i.test(f.type)) { setStatus('El archivo parece JSON, pero no se puede editar con seguridad: '+err.message, 'bad'); return; }
+      }
+      const controlChars = Array.from(text).filter(ch => { const c=ch.charCodeAt(0); return c<32 && c!==9 && c!==10 && c!==13; }).length;
+      if (!text.includes('\uFFFD') && !text.includes('\0') && controlChars===0) {
         kind = 'text'; editor.value = text; originalText = text;
         editorPanel.classList.remove('hidden'); setStatus('Texto UTF-8 legible reconocido. Se puede descargar como copia de texto, no como archivo de guardado validado.', 'warn'); validate(); return;
       }
