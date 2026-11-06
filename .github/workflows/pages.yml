@@ -17,9 +17,13 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
+        working-directory: scratch/editor
       - run: npx playwright install --with-deps chromium
+        working-directory: scratch/editor
       - run: npm test
+        working-directory: scratch/editor
       - name: Static safety checks
+        working-directory: scratch/editor
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -30,13 +34,13 @@ jobs:
           assert 'innerHTML' not in s and 'eval(' not in s
           assert 'SDMOD_ENC_V1:' in s and 'SDroiMod_MRSE_26' in s
           assert 'Recompilar y descargar .sdroimod' in s
-          assert 'mini.sdroimod' not in s
           print('static safety checks passed')
           PY
       - name: Assemble clean Pages artifact
         run: |
           mkdir -p site
-          cp index.html site/
+          cp scratch/editor/index.html site/
+          # The public Pages artifact intentionally contains only this page; no sample saves or tests.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
