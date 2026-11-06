@@ -34,6 +34,7 @@ jobs:
           assert 'innerHTML' not in s and 'eval(' not in s
           assert 'SDMOD_ENC_V1:' in s and 'SDroiMod_MRSE_26' in s
           assert 'Recompilar y descargar .sdroimod' in s
+          assert 'mini.sdroimod' not in s
           print('static safety checks passed')
           PY
       - name: Assemble clean Pages artifact
