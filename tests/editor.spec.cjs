@@ -22,14 +22,14 @@ function decrypt(bytes) {
  const browser=await chromium.launch({headless:true});
  try {
   const context=await browser.newContext({acceptDownloads:true,serviceWorkers:'block'});
-  const page=await context.newPage();let unexpected=[];
+  const page=await context.newPage();let unexpected=[],pageErrors=[];page.on('pageerror',e=>pageErrors.push(String(e)));
   await page.route('**/*',route=>{if(route.request().url().startsWith('http://127.0.0.1:8765/'))return route.continue();unexpected.push(route.request().url());return route.abort()});
   page.on('request',r=>{if(!r.url().startsWith('http://127.0.0.1:8765/'))unexpected.push(r.url())});
   await page.goto('http://127.0.0.1:8765/');
   const original='character\n{\n\tcoins = 1522078;\n\tfacts = achievement-one:true\\;achievement-two:true;\n\tgold = 25142644;\n\tlevel = 40;\n}\n\nEOF____';
   const zip=zipSync({'slot0.player':encrypt(original)},{level:6});
   await page.locator('#file').setInputFiles({name:'synthetic.sdroimod',mimeType:'application/zip',buffer:Buffer.from(zip)});
-  await page.getByLabel('Oro (gold)').waitFor();
+  try { await page.getByLabel('Oro (gold)').waitFor({timeout:8000}); } catch (e) { console.error('EDITOR STATUS:', await page.locator('#status').textContent()); console.error('PAGE ERRORS:', pageErrors); throw e; }
   assert.equal(await page.locator('#field-gold').inputValue(),'25142644');
   await page.locator('#field-gold').fill('999888');
   const promise=page.waitForEvent('download');await page.getByRole('button',{name:'Recompilar y descargar .sdroimod'}).click();
