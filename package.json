@@ -1,0 +1,1 @@
+{"name":"sdroimod-editor-tests","private":true,"version":"1.0.0","scripts":{"test":"node tests/editor.spec.cjs"},"devDependencies":{"fflate":"0.8.2","playwright":"1.55.0","crypto-js":"4.2.0"}}
